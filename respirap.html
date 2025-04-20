@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Respirapp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#007BFF">
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      background-color: #f0f8ff;
+    }
+
+    #contenido {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    #mensaje {
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+
+    #circulo {
+      width: 50px;
+      height: 50px;
+      background-color: #4caf50;
+      border-radius: 50%;
+      transition: width 0.1s linear, height 0.1s linear, background-color 0.5s ease;
+    }
+
+    #contador {
+      margin-top: 20px;
+      font-size: 1.2em;
+      color: #555;
+    }
+
+    #boton {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      padding: 15px 0;
+      font-size: 1.2em;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      cursor: pointer;
+      z-index: 1000;
+    }
+
+    #boton:disabled {
+      background-color: #aaa;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="contenido">
+    <div id="mensaje">Pulsa el botón para comenzar</div>
+    <div id="circulo"></div>
+    <div id="contador"></div>
+    <button id="instalarBtn" style="display: none; margin-top: 10px;">Instalar app</button>
+  </div>
+
+  <button id="boton">Púlsame</button>
+
+  <script>
+    const circulo = document.getElementById('circulo');
+    const mensaje = document.getElementById('mensaje');
+    const contador = document.getElementById('contador');
+    const boton = document.getElementById('boton');
+
+    let animando = false;
+    let frameId = null;
+    let pausaTimeout = null;
+    let cicloActual = 0;
+    const totalCiclos = 4;
+
+    const duracionInhalar = 4000;
+    const duracionExhalar = 6000;
+    const pausa = 2000;
+    const maxTam = 200;
+    const minTam = 50;
+
+    function reset() {
+      animando = false;
+      cicloActual = 0;
+      boton.textContent = "Púlsame";
+      mensaje.textContent = "Pulsa el botón para comenzar";
+      circulo.style.width = `${minTam}px`;
+      circulo.style.height = `${minTam}px`;
+      circulo.style.backgroundColor = '#4caf50';
+      contador.textContent = "";
+      if (frameId) cancelAnimationFrame(frameId);
+      if (pausaTimeout) clearTimeout(pausaTimeout);
+    }
+
+    function animarRespiracion() {
+      if (animando) {
+        reset();
+        return;
+      }
+
+      animando = true;
+      cicloActual = 0;
+      boton.textContent = "Detener";
+      contador.textContent = `Ciclo: ${cicloActual}/${totalCiclos}`;
+      inhalar();
+    }
+
+    function inhalar() {
+      if (!animando) return;
+
+      let startTime = null;
+      circulo.style.backgroundColor = '#4caf50';
+      mensaje.textContent = 'Coje aire';
+
+      function animar(timestamp) {
+        if (!startTime) startTime = timestamp;
+        let elapsed = timestamp - startTime;
+        let progress = Math.min(elapsed / duracionInhalar, 1);
+        let easeOut = 1 - Math.pow(1 - progress, 2);
+        let size = minTam + (maxTam - minTam) * easeOut;
+        circulo.style.width = `${size}px`;
+        circulo.style.height = `${size}px`;
+
+        if (elapsed < duracionInhalar) {
+          frameId = requestAnimationFrame(animar);
+        } else {
+          pausaEntre(exhalar);
+        }
+      }
+
+      frameId = requestAnimationFrame(animar);
+    }
+
+    function exhalar() {
+      if (!animando) return;
+
+      let startTime = null;
+      circulo.style.backgroundColor = '#87CEFA';
+      mensaje.textContent = 'Exhala';
+
+      function animar(timestamp) {
+        if (!startTime) startTime = timestamp;
+        let elapsed = timestamp - startTime;
+        let progress = Math.min(elapsed / duracionExhalar, 1);
+        let easeIn = Math.pow(progress, 2);
+        let size = maxTam - (maxTam - minTam) * easeIn;
+        circulo.style.width = `${size}px`;
+        circulo.style.height = `${size}px`;
+
+        if (elapsed < duracionExhalar) {
+          frameId = requestAnimationFrame(animar);
+        } else {
+          cicloActual++;
+          if (cicloActual < totalCiclos) {
+            contador.textContent = `Ciclo: ${cicloActual}/${totalCiclos}`;
+            pausaEntre(inhalar);
+          } else {
+            finalizar();
+          }
+        }
+      }
+
+      frameId = requestAnimationFrame(animar);
+    }
+
+    function pausaEntre(callback) {
+      mensaje.textContent = '...';
+      pausaTimeout = setTimeout(() => {
+        if (animando) callback();
+      }, pausa);
+    }
+
+    function finalizar() {
+      mensaje.textContent = '😊';
+      contador.textContent = '¡Bien hecho! ';
+      boton.textContent = "Volver a empezar";
+      animando = false;
+    }
+
+    boton.addEventListener('click', animarRespiracion);
+    //instalar
+    let deferredPrompt;
+    const instalarBtn = document.getElementById('instalarBtn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      instalarBtn.style.display = 'inline-block';
+    });
+
+    instalarBtn.addEventListener('click', () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('Instalación aceptada');
+            instalarBtn.style.display = 'none';
+          } else {
+            console.log('Instalación rechazada');
+          }
+          deferredPrompt = null;
+        });
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('App instalada');
+      instalarBtn.style.display = 'none';
+    });
+
+    // Registrar el service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(() => {
+        console.log('Service Worker registrado');
+      });
+    }
+  </script>
+</body>
+</html>
